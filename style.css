@@ -1,0 +1,34 @@
+body, html {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #000;
+    touch-action: none; /* Отключаем нативный скролл и зум браузера */
+}
+
+#viewport {
+    width: 100vw; height: 100vh;
+    position: relative; overflow: hidden;
+}
+
+#canvas {
+    position: absolute; top: 0; left: 0;
+    transform-origin: 0 0; 
+    will-change: transform;
+}
+
+.item {
+    position: absolute; cursor: pointer;
+    background: #111;
+    outline: 1px solid #000; /* Маскируем субпиксельные щели */
+}
+
+.item img {
+    width: 100%; height: 100%;
+    object-fit: cover; pointer-events: none;
+    display: block;
+}
+
+#overlay {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 1000; pointer-events: none;
+}
