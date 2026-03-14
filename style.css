@@ -1,24 +1,29 @@
+/* Обнуляем настройки браузера */
 body, html {
     margin: 0; padding: 0; width: 100%; height: 100%;
     overflow: hidden; background: #000;
-    touch-action: none; /* Отключаем нативный скролл и зум браузера */
+    touch-action: none; /* Отключаем системный зум, чтобы он не мешал нашему */
 }
 
+/* Окно, через которое мы смотрим на холст */
 #viewport {
     width: 100vw; height: 100vh;
     position: relative; overflow: hidden;
 }
 
+/* Сам бесконечный холст */
 #canvas {
     position: absolute; top: 0; left: 0;
-    transform-origin: 0 0; 
-    will-change: transform;
+    transform-origin: 0 0; /* Важно для зума из точки фокуса */
+    will-change: transform; /* Включаем видеокарту на максимум */
 }
 
+/* Контейнер для каждой картинки */
 .item {
     position: absolute; cursor: pointer;
     background: #111;
-    outline: 1px solid #000; /* Маскируем субпиксельные щели */
+    /* Тот самый хак: 1px рамка в цвет фона, чтобы скрыть швы */
+    outline: 1px solid #000; 
 }
 
 .item img {
@@ -27,6 +32,7 @@ body, html {
     display: block;
 }
 
+/* Верхний слой для увеличения картинки на весь экран */
 #overlay {
     position: fixed; top: 0; left: 0;
     width: 100vw; height: 100vh;
