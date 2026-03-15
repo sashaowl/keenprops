@@ -1,127 +1,112 @@
-gsap.registerPlugin(Observer, Flip);
+gsap.registerPlugin(Observer);
 
-const TILE_W = 8532; // Ширина блока из Figma
-const TILE_H = 4740; // Высота блока
+const TILE_W = 8532;
+const TILE_H = 4740;
 const UNIT_SIZE = 948;
 
-let scale = 1;
-let curX = -TILE_W; // Начинаем из центра сетки 3x3
+let curScale = 1;
+let curX = -TILE_W; 
 let curY = -TILE_H;
-let isLocked = false; // Блокировка при открытом объекте
 
-// 1. Адаптивный масштаб по вашим замерам 
-function updateScale() {
+const MIN_SCALE = 0.1; // Позволяем отдалять очень сильно
+const MAX_SCALE = 1.0;
+
+function getBaseScale() {
     const ww = window.innerWidth;
-    const targetVisibleCols = ww < 768? 3 : 4.2; // 3 на мобилках, ~4.2 на десктопе
-    scale = ww / (targetVisibleCols * UNIT_SIZE);
+    const targetCols = ww < 768? 3 : 4.5;
+    return ww / (targetCols * UNIT_SIZE);
 }
 
+curScale = getBaseScale();
+
+// Защита для Safari: перехватываем начало касания у краев экрана
+window.addEventListener('touchstart', (e) => {
+    if (e.pageX < 20 |
+
+| e.pageX > window.innerWidth - 20) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
 async function init() {
-    updateScale();
     const response = await fetch('./data.json');
     const data = await response.json();
     const canvas = document.querySelector('#canvas');
 
-    // 2. Исправленный массив Offsets для сетки 3x3 [4, 5]
-    const offsets = [];
+    const offsets =;
     for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
-            offsets.push({ dx: i * TILE_W, dy: j * TILE_H, id: `${i}${j}` });
+            offsets.push({ dx: i * TILE_W, dy: j * TILE_H });
         }
     }
 
-    // 3. Рендерим 297 элементов (33 объекта * 9 копий)
     data.forEach(item => {
         offsets.forEach(offset => {
             const el = document.createElement('div');
             el.className = 'item';
-            // Уникальный ID для Flip: "название-сетка"
-            el.dataset.flipId = `${item.id}-${offset.id}`; 
-            
             gsap.set(el, {
                 x: item.x + offset.dx,
                 y: item.y + offset.dy,
                 width: item.w,
                 height: item.h
             });
-
             const img = new Image();
             img.src = `./images/${item.id}.webp`;
-            img.loading = "lazy";
             el.appendChild(img);
             canvas.appendChild(el);
-
-            el.addEventListener('click', () => handleFlip(el));
         });
     });
 
     render();
-    setupObserver();
-
-    window.addEventListener('resize', () => {
-        updateScale();
-        render();
-    });
+    setupInteraction();
 }
 
 function render() {
-    // 4. Бесконечное зацикливание (Wrapping) [6, 7]
+    // Бесконечный цикл по принципу беговой дорожки
     const wrappedX = gsap.utils.wrap(-TILE_W * 2, -TILE_W, curX);
     const wrappedY = gsap.utils.wrap(-TILE_H * 2, -TILE_H, curY);
 
     gsap.set("#canvas", {
-        x: wrappedX * scale,
-        y: wrappedY * scale,
-        scale: scale
+        x: wrappedX * curScale,
+        y: wrappedY * curScale,
+        scale: curScale
     });
 }
 
-function setupObserver() {
+function setupInteraction() {
     Observer.create({
         target: window,
         type: "wheel,touch,pointer",
+        preventDefault: true, // Ключ к подавлению жеста "Назад"
+        
         onChange: (self) => {
-            if (isLocked) return;
-            // Делим дельту на scale, чтобы скорость движения была одинаковой при любом зуме
-            curX += self.deltaX / scale;
-            curY += self.deltaY / scale;
+            // Движение холста
+            curX += self.deltaX / curScale;
+            curY += self.deltaY / curScale;
             render();
+        },
+        
+        onZoom: (self) => {
+            // Фокусный зум (Zoom at Focal Point)
+            const factor = self.deltaY > 0? 0.95 : 1.05;
+            const newScale = gsap.utils.clamp(MIN_SCALE, MAX_SCALE, curScale * factor);
+            
+            if (newScale!== curScale) {
+                // Математическая коррекция смещения:
+                // Чтобы точка под курсором осталась на месте, пересчитываем X и Y
+                // T_new = P_focal - (P_focal - T_old) * (S_new / S_old)
+                curX = self.x / newScale - (self.x / curScale - curX);
+                curY = self.y / newScale - (self.y / curScale - curY);
+                
+                curScale = newScale;
+                render();
+            }
         }
     });
-}
 
-// 5. Логика FLIP-перехода [8, 9]
-function handleFlip(el) {
-    if (isLocked) return;
-    isLocked = true;
-
-    const state = Flip.getState(el);
-    const overlay = document.querySelector('#overlay');
-    
-    // Создаем временный клон для анимации в оверлее
-    const clone = el.cloneNode(true);
-    overlay.appendChild(clone);
-
-    // Устанавливаем финишное состояние (Lightbox)
-    gsap.set(clone, { 
-        position: 'fixed', 
-        top: '50%', left: '50%', 
-        xPercent: -50, yPercent: -50,
-        width: 'auto', height: '80vh', 
-        x: 0, y: 0 
-    });
-
-    Flip.from(state, {
-        duration: 0.7,
-        ease: "power3.inOut",
-        targets: clone,
-        onComplete: () => {
-            clone.style.pointerEvents = "auto";
-            clone.onclick = () => {
-                isLocked = false;
-                gsap.to(clone, { opacity: 0, onComplete: () => clone.remove() });
-            };
-        }
+    window.addEventListener('resize', () => {
+        curScale = getBaseScale();
+        render();
     });
 }
 
