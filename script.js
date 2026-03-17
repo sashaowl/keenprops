@@ -8,7 +8,7 @@ let curScale = 1;
 let curX = -TILE_W; 
 let curY = -TILE_H;
 
-const MIN_SCALE = 0.1; // Позволяем отдалять очень сильно
+const MIN_SCALE = 0.1; 
 const MAX_SCALE = 1.0;
 
 function getBaseScale() {
@@ -19,53 +19,80 @@ function getBaseScale() {
 
 curScale = getBaseScale();
 
-// Защита для Safari и переменные для зума
+// ==========================================
+// 1. НАСТРОЙКА БРАУЗЕРА (Блокировка системного зума)
+// ==========================================
+// Жесткий перехват ctrl+wheel для macOS, чтобы браузер не увеличивал весь UI
+document.addEventListener('wheel', (e) => {
+    if (e.ctrlKey) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+
+// ==========================================
+// 2. МОБИЛЬНЫЙ ЗУМ (Нативный Pinch-to-zoom)
+// ==========================================
 let initialPinchDistance = null;
 let initialScale = 1;
-let isPinching = false; // Флаг для блокировки GSAP Observer
-
-// Функция для вычисления расстояния между двумя касаниями
-function getPinchDistance(touch1, touch2) {
-    const dx = touch1.clientX - touch2.clientX;
-    const dy = touch1.clientY - touch2.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-}
+let isPinching = false; 
 
 window.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1 && (e.touches[0].pageX < 20 || e.touches[0].pageX > window.innerWidth - 20)) {
         e.preventDefault();
     }
-
     if (e.touches.length === 2) {
         e.preventDefault(); 
-        e.stopPropagation(); // Не отдаем событие GSAP
+        e.stopPropagation(); 
         isPinching = true;
-        initialPinchDistance = getPinchDistance(e.touches[0], e.touches[1]);
+        
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
         initialScale = curScale; 
     }
-}, { passive: false, capture: true }); // capture: true делает этот код приоритетным
+}, { passive: false, capture: true });
 
 window.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 2 && initialPinchDistance !== null) {
+    if (e.touches.length === 2 && isPinching) {
         e.preventDefault();
-        e.stopPropagation(); // Не отдаем событие GSAP
+        e.stopPropagation(); 
         
-        const currentDistance = getPinchDistance(e.touches[0], e.touches[1]);
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        
+        const dx = t1.clientX - t2.clientX;
+        const dy = t1.clientY - t2.clientY;
+        const currentDistance = Math.sqrt(dx * dx + dy * dy);
+        
         const scaleFactor = currentDistance / initialPinchDistance;
-        
-        curScale = Math.max(MIN_SCALE, Math.min(initialScale * scaleFactor, MAX_SCALE)); 
+        const newScale = Math.max(MIN_SCALE, Math.min(initialScale * scaleFactor, MAX_SCALE)); 
 
-        render(); 
+        if (newScale !== curScale) {
+            // Вычисляем точку фокуса (середину между пальцами)
+            const focalX = (t1.clientX + t2.clientX) / 2;
+            const focalY = (t1.clientY + t2.clientY) / 2;
+            
+            // Магическая компенсация координат
+            curX = focalX / newScale - (focalX / curScale - curX);
+            curY = focalY / newScale - (focalY / curScale - curY);
+            curScale = newScale;
+            
+            render();
+        }
     }
 }, { passive: false, capture: true });
 
 window.addEventListener('touchend', (e) => {
-    if (e.touches && e.touches.length < 2) {
-        initialPinchDistance = null;
+    if (e.touches.length < 2) {
         isPinching = false;
     }
 }, { passive: false, capture: true });
 
+
+// ==========================================
+// 3. ОСНОВНАЯ ЛОГИКА
+// ==========================================
 async function init() {
     const response = await fetch('./data.json');
     const data = await response.json();
@@ -100,7 +127,6 @@ async function init() {
 }
 
 function render() {
-    // Бесконечный цикл по принципу беговой дорожки
     const wrappedX = gsap.utils.wrap(-TILE_W * 2, -TILE_W, curX);
     const wrappedY = gsap.utils.wrap(-TILE_H * 2, -TILE_H, curY);
 
@@ -111,34 +137,52 @@ function render() {
     });
 }
 
+
+// ==========================================
+// 4. ДЕСКТОП И ТАЧПАД (GSAP Observer)
+// ==========================================
 function setupInteraction() {
     Observer.create({
         target: window,
-        type: "wheel,touch,pointer",
-        preventDefault: true, // Ключ к подавлению жеста "Назад"
+        // ВАЖНО: Убрали "touch" из type, чтобы он не перехватывал работу пальцами
+        type: "wheel,pointer", 
+        preventDefault: true, 
         
-        onChange: (self) => {
-            // Если сейчас идет зум двумя пальцами — игнорируем панорамирование
+        onDrag: (self) => {
             if (isPinching) return; 
-
-            // Движение холста
+            
+            // Панорамирование при зажатии левой кнопки мыши
             curX += self.deltaX / curScale;
             curY += self.deltaY / curScale;
             render();
         },
         
-        onZoom: (self) => {
-            // Фокусный зум (Zoom at Focal Point)
-            const factor = self.deltaY > 0 ? 0.95 : 1.05;
-            const newScale = gsap.utils.clamp(MIN_SCALE, MAX_SCALE, curScale * factor);
-            
-            if (newScale !== curScale) {
-                // Математическая коррекция смещения:
-                // Чтобы точка под курсором осталась на месте, пересчитываем X и Y
-                curX = self.x / newScale - (self.x / curScale - curX);
-                curY = self.y / newScale - (self.y / curScale - curY);
+        onWheel: (self) => { 
+            if (isPinching) return;
+
+            // Если зажат Ctrl (это зум с клавиатуры или щипок на тачпаде MacBook)
+            if (self.event.ctrlKey) {
+                // Вычисляем новый масштаб (используем экспоненту для плавности как на тачпаде, так и на мышке)
+                const zoomFactor = Math.exp(self.deltaY * -0.005);
+                const newScale = gsap.utils.clamp(MIN_SCALE, MAX_SCALE, curScale * zoomFactor);
                 
-                curScale = newScale;
+                if (newScale !== curScale) {
+                    // Фокусная точка - координаты курсора
+                    const focalX = self.x;
+                    const focalY = self.y;
+                    
+                    // Компенсация координат
+                    curX = focalX / newScale - (focalX / curScale - curX);
+                    curY = focalY / newScale - (focalY / curScale - curY);
+                    curScale = newScale;
+                    render();
+                }
+            } 
+            // Обычный скролл без Ctrl (колесико мыши или два пальца по тачпаду)
+            else {
+                // Панорамирование
+                curX -= (self.deltaX * 2) / curScale; 
+                curY -= (self.deltaY * 2) / curScale;
                 render();
             }
         }
