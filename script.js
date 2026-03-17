@@ -9,7 +9,7 @@ let curX = -TILE_W;
 let curY = -TILE_H;
 
 const MIN_SCALE = 0.4; 
-const MAX_SCALE = 1.0;
+const MAX_SCALE = 3.0;
 
 function getBaseScale() {
     const ww = window.innerWidth;
