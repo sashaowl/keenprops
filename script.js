@@ -13,18 +13,55 @@ const MAX_SCALE = 1.0;
 
 function getBaseScale() {
     const ww = window.innerWidth;
-    const targetCols = ww < 768? 3 : 4.5;
+    const targetCols = ww < 768 ? 3 : 4.5;
     return ww / (targetCols * UNIT_SIZE);
 }
 
 curScale = getBaseScale();
 
-// Защита для Safari: перехватываем начало касания у краев экрана
+// Защита для Safari и переменные для зума
+let initialPinchDistance = null;
+let initialScale = 1;
+let isPinching = false; // Флаг для блокировки GSAP Observer
+
+// Функция для вычисления расстояния между двумя касаниями
+function getPinchDistance(touch1, touch2) {
+    const dx = touch1.clientX - touch2.clientX;
+    const dy = touch1.clientY - touch2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
 window.addEventListener('touchstart', (e) => {
-   if (e.pageX < 20 || e.pageX > window.innerWidth - 20) {
-      e.preventDefault();
-   }
+    if (e.touches.length === 1 && (e.touches[0].pageX < 20 || e.touches[0].pageX > window.innerWidth - 20)) {
+        e.preventDefault();
+    }
+
+    if (e.touches.length === 2) {
+        e.preventDefault(); 
+        isPinching = true; // Сообщаем, что начался зум
+        initialPinchDistance = getPinchDistance(e.touches[0], e.touches[1]);
+        initialScale = curScale; 
+    }
 }, { passive: false });
+
+window.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && initialPinchDistance !== null) {
+        e.preventDefault();
+        const currentDistance = getPinchDistance(e.touches[0], e.touches[1]);
+        const scaleFactor = currentDistance / initialPinchDistance;
+        
+        curScale = Math.max(MIN_SCALE, Math.min(initialScale * scaleFactor, MAX_SCALE)); 
+
+        render(); 
+    }
+}, { passive: false });
+
+window.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+        initialPinchDistance = null;
+        isPinching = false; // Отключаем зум, разрешаем панорамирование
+    }
+});
 
 async function init() {
     const response = await fetch('./data.json');
@@ -78,6 +115,9 @@ function setupInteraction() {
         preventDefault: true, // Ключ к подавлению жеста "Назад"
         
         onChange: (self) => {
+            // Если сейчас идет зум двумя пальцами — игнорируем панорамирование
+            if (isPinching) return; 
+
             // Движение холста
             curX += self.deltaX / curScale;
             curY += self.deltaY / curScale;
@@ -86,13 +126,12 @@ function setupInteraction() {
         
         onZoom: (self) => {
             // Фокусный зум (Zoom at Focal Point)
-            const factor = self.deltaY > 0? 0.95 : 1.05;
+            const factor = self.deltaY > 0 ? 0.95 : 1.05;
             const newScale = gsap.utils.clamp(MIN_SCALE, MAX_SCALE, curScale * factor);
             
-            if (newScale!== curScale) {
+            if (newScale !== curScale) {
                 // Математическая коррекция смещения:
                 // Чтобы точка под курсором осталась на месте, пересчитываем X и Y
-                // T_new = P_focal - (P_focal - T_old) * (S_new / S_old)
                 curX = self.x / newScale - (self.x / curScale - curX);
                 curY = self.y / newScale - (self.y / curScale - curY);
                 
