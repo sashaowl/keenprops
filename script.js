@@ -8,7 +8,7 @@ let curScale = 1;
 let curX = -TILE_W; 
 let curY = -TILE_H;
 
-const MIN_SCALE = 0.1; 
+const MIN_SCALE = 0.4; 
 const MAX_SCALE = 1.0;
 
 function getBaseScale() {
