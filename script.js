@@ -21,11 +21,9 @@ curScale = getBaseScale();
 
 // Защита для Safari: перехватываем начало касания у краев экрана
 window.addEventListener('touchstart', (e) => {
-    if (e.pageX < 20 |
-
-| e.pageX > window.innerWidth - 20) {
-        e.preventDefault();
-    }
+   if (e.pageX < 20 || e.pageX > window.innerWidth - 20) {
+      e.preventDefault();
+   }
 }, { passive: false });
 
 async function init() {
@@ -33,7 +31,7 @@ async function init() {
     const data = await response.json();
     const canvas = document.querySelector('#canvas');
 
-    const offsets =;
+    const offsets = [];
     for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
             offsets.push({ dx: i * TILE_W, dy: j * TILE_H });
