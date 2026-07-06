@@ -13,7 +13,7 @@ const MAX_SCALE = 3.0;
 
 function getBaseScale() {
     const ww = window.innerWidth;
-    const targetCols = ww < 768 ? 3 : 4.5;
+    const targetCols = ww < 768 ? 2.6 : 3.9;
     return ww / (targetCols * UNIT_SIZE);
 }
 
