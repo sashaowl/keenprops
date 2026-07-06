@@ -109,12 +109,15 @@ async function init() {
         offsets.forEach(offset => {
             const el = document.createElement('div');
             el.className = 'item';
+            
+            // ИСПРАВЛЕНО: Теперь берем width и height вместо w и h
             gsap.set(el, {
                 x: item.x + offset.dx,
                 y: item.y + offset.dy,
-                width: item.w,
-                height: item.h
+                width: item.width, 
+                height: item.height 
             });
+            
             const img = new Image();
             img.src = `./images/${item.id}.webp`;
             el.appendChild(img);
