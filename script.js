@@ -8,13 +8,13 @@ let curScale = 1;
 let curX = -TILE_W; 
 let curY = -TILE_H;
 
-const MIN_SCALE = 0.56; // Увеличено на 40% (0.4 * 1.4) для соответствия новому масштабу
-const MAX_SCALE = 4.2;  // Увеличено на 40% (3.0 * 1.4)
+const MIN_SCALE = 0.5; // Увеличено на 25% (0.4 * 1.25) для соответствия новому масштабу
+const MAX_SCALE = 3.75; // Увеличено на 25% (3.0 * 1.25)
 
 function getBaseScale() {
     const ww = window.innerWidth;
     const targetCols = ww < 768 ? 1.5 : 2.5;
-    return (ww / (targetCols * UNIT_SIZE)) * 1.4; // Базовый масштаб увеличен на 40%
+    return (ww / (targetCols * UNIT_SIZE)) * 1.25; // Базовый масштаб увеличен на 25%
 }
 
 curScale = getBaseScale();
@@ -87,6 +87,10 @@ window.addEventListener('touchend', (e) => {
     if (e.touches.length < 2) {
         isPinching = false;
     }
+}, { passive: false, capture: true });
+
+window.addEventListener('touchcancel', () => {
+    isPinching = false;
 }, { passive: false, capture: true });
 
 
@@ -170,9 +174,9 @@ function setupInteraction() {
                 const newScale = gsap.utils.clamp(MIN_SCALE, MAX_SCALE, curScale * zoomFactor);
                 
                 if (newScale !== curScale) {
-                    // Фокусная точка - координаты курсора
-                    const focalX = self.x;
-                    const focalY = self.y;
+                    // Фокусная точка - координаты курсора из нативного события (исправлена проблема с NaN)
+                    const focalX = self.event ? self.event.clientX : window.innerWidth / 2;
+                    const focalY = self.event ? self.event.clientY : window.innerHeight / 2;
                     
                     // Компенсация координат
                     curX = focalX / newScale - (focalX / curScale - curX);
