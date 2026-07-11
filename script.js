@@ -8,13 +8,13 @@ let curScale = 1;
 let curX = -TILE_W; 
 let curY = -TILE_H;
 
-const MIN_SCALE = 0.4; 
-const MAX_SCALE = 3.0;
+const MIN_SCALE = 0.56; // Увеличено на 40% (0.4 * 1.4) для соответствия новому масштабу
+const MAX_SCALE = 4.2;  // Увеличено на 40% (3.0 * 1.4)
 
 function getBaseScale() {
     const ww = window.innerWidth;
     const targetCols = ww < 768 ? 1.5 : 2.5;
-    return ww / (targetCols * UNIT_SIZE);
+    return (ww / (targetCols * UNIT_SIZE)) * 1.4; // Базовый масштаб увеличен на 40%
 }
 
 curScale = getBaseScale();
